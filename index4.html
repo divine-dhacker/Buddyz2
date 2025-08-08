@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Buddyz — BFF Quiz</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#f5f7ff;--card:#fff;--accent:#6d28d9;--muted:#667;--ok:#16a34a}
+  *{box-sizing:border-box}
+  body{font-family:'Poppins',sans-serif;background:var(--bg);margin:0;padding:18px;color:#111}
+  .wrap{max-width:840px;margin:0 auto}
+  header{display:flex;align-items:center;gap:12px}
+  header .logo{width:56px;height:56px;border-radius:12px;background:linear-gradient(135deg,#8b5cf6,#06b6d4);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700}
+  h1{margin:6px 0;font-size:20px}
+  .card{background:var(--card);border-radius:12px;padding:18px;box-shadow:0 6px 24px rgba(10,10,10,.06);margin-top:16px}
+  .small{font-size:13px;color:var(--muted)}
+  input[type="text"]{width:100%;padding:10px;border-radius:8px;border:1px solid #e6e6f0}
+  .btn{background:var(--accent);color:#fff;border:0;padding:10px 14px;border-radius:10px;cursor:pointer}
+  .secondary{background:#eef2ff;color:#111;border:0;padding:8px 12px;border-radius:8px;cursor:pointer}
+  .center{display:flex;gap:8px;align-items:center}
+  .question-card{display:flex;flex-direction:column;gap:12px}
+  .q-image{width:100%;height:220px;border-radius:10px;object-fit:cover;background:#f0f0f5}
+  .options{display:flex;flex-direction:column;gap:8px}
+  .opt{padding:12px;border-radius:10px;border:1px solid #eee;background:#fff;text-align:left;cursor:pointer}
+  .opt.selected{border-color:var(--accent);box-shadow:0 4px 14px rgba(109,40,217,.08);background:linear-gradient(180deg,#fbf7ff,#fff)}
+  .progress{height:8px;background:#f0f0ff;border-radius:6px;overflow:hidden}
+  .progress .bar{height:100%;background:linear-gradient(90deg,#8b5cf6,#06b6d4);width:0%}
+  .meta-row{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+  .linkbox{display:flex;gap:8px}
+  .linkbox input{padding:8px;border-radius:8px;border:1px solid #eee}
+  .leaderboard li{padding:8px;border-radius:8px;background:#fbfbff;margin:6px 0;list-style:none}
+  footer.small{margin-top:12px;color:var(--muted)}
+  .quiz-results-container { margin-top: 12px; padding: 12px; border-radius: 8px; background: #f7f7f7; }
+  .quiz-results-container h4 { margin-top: 0; }
+  .quiz-results-container .small { margin-top: 4px; }
+  @media(min-width:880px){ .two-col{display:grid;grid-template-columns:1fr 340px;gap:18px} .q-image{height:320px} }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="logo">BZ</div>
+      <div>
+        <h1>Buddyz — BFF Friendship Quiz</h1>
+        <div class="small">Create a quiz, share it, and find out who really knows you. One question at a time ✅</div>
+      </div>
+    </header>
+
+    <main id="app" class="card">
+      <div id="boot" class="small">Loading…</div>
+    </main>
+
+    <footer class="small">Tip: For local testing open via a simple static server (or use Firebase Hosting). If you see permission errors, check Firebase rules (instructions shown below).</footer>
+  </div>
+
+  <script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+  import { getDatabase, ref, push, set, get, child, onValue } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-database.js";
+
+    // Your Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyDF9rZesIRYwJ0fFM1Q06X8DfZ1_J7e1Yg",
+      authDomain: "buddyz-6781f.firebaseapp.com",
+      databaseURL: "https://buddyz-6781f-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "buddyz-6781f",
+      storageBucket: "buddyz-6781f.firebasestorage.app",
+      messagingSenderId: "612185808963",
+      appId: "1:612185808963:web:7b4387eca1bd2bf5f074f6"
+    };
+
+    if (!firebaseConfig || !firebaseConfig.apiKey) {
+      document.getElementById('app').innerHTML = `<div class="small">⚠️ Paste your <code>firebaseConfig</code> object into the top of this file and reload.</div>`;
+      throw new Error('Missing firebaseConfig — paste your keys.');
+    }
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // --- QUESTION BANK (50 items) ---
+    const QUESTIONS = [
+      { q: "What's my favourite food?", opts:["Pizza","Jollof","Burgers","Pasta"], img:"https://picsum.photos/id/1015/1200/700" },
+      { q: "What's my favourite movie genre?", opts:["Comedy","Horror","Romance","Action"], img:"https://picsum.photos/id/1025/1200/700" },
+      { q: "Which city was I born in?", opts:["Lagos","Abuja","Kano","Port Harcourt"], img:"https://picsum.photos/id/1011/1200/700" },
+      { q: "What's my go-to coffee order?", opts:["Black","Latte","Cappuccino","No coffee"], img:"https://picsum.photos/id/1035/1200/700" },
+      { q: "What's my favourite season?", opts:["Summer","Winter","Spring","Autumn"], img:"https://picsum.photos/id/1041/1200/700" },
+      { q: "Which pet do I prefer?", opts:["Dog","Cat","Bird","No pets"], img:"https://picsum.photos/id/1027/1200/700" },
+      { q: "What's my favourite sport to watch?", opts:["Football","Basketball","Tennis","Cricket"], img:"https://picsum.photos/id/1012/1200/700" },
+      { q: "What's my favourite music vibe?", opts:["Rap/Hip-hop","Pop","Rock","R&B"], img:"https://picsum.photos/id/1005/1200/700" },
+      { q: "What's my dream vacation type?", opts:["Beach","Mountains","City-break","Safari"], img:"https://picsum.photos/id/1016/1200/700" },
+      { q: "What's my favourite ice-cream flavor?", opts:["Vanilla","Chocolate","Strawberry","Mint"], img:"https://picsum.photos/id/1056/1200/700" },
+      { q: "Do I like spicy food?", opts:["Yes","No","Sometimes","Only mild spice"], img:"https://picsum.photos/id/1060/1200/700" },
+      { q: "What's my favourite social app?", opts:["Instagram","TikTok","WhatsApp","Twitter"], img:"https://picsum.photos/id/1084/1200/700" },
+      { q: "What's my favourite dessert?", opts:["Cake","Pie","Cookies","Fruit"], img:"https://picsum.photos/id/1080/1200/700" },
+      { q: "Would I jump out of a plane for fun?", opts:["Yes","No","Maybe","Only with instructor"], img:"https://picsum.photos/id/1032/1200/700" },
+      { q: "What's my astrological sign?", opts:["Aries","Taurus","Gemini","Cancer"], img:"https://picsum.photos/id/1021/1200/700" },
+      { q: "How do I take my eggs?", opts:["Scrambled","Boiled","Fried","I don't eat eggs"], img:"https://picsum.photos/id/1039/1200/700" },
+      { q: "What's my favourite color?", opts:["Blue","Red","Green","Purple"], img:"https://picsum.photos/id/1003/1200/700" },
+      { q: "Which genre do I prefer to read?", opts:["Sci-fi","Romance","Non-fiction","Mystery"], img:"https://picsum.photos/id/1013/1200/700" },
+      { q: "What's my favourite holiday?", opts:["Christmas","Eid","New Year","My birthday"], img:"https://picsum.photos/id/1024/1200/700" },
+      { q: "Do I prefer mornings or nights?", opts:["Mornings","Nights","Both","Depends"], img:"https://picsum.photos/id/1074/1200/700" },
+      { q: "What's my go-to snack?", opts:["Chips","Chocolate","Fruit","Nuts"], img:"https://picsum.photos/id/1082/1200/700" },
+      { q: "My favourite hobby?", opts:["Gaming","Painting","Sport","Cooking"], img:"https://picsum.photos/id/109/1200/700" },
+      { q: "What's my dream job?", opts:["Entrepreneur","Artist","Engineer","Teacher"], img:"https://picsum.photos/id/1052/1200/700" },
+      { q: "What's my favourite drink?", opts:["Water","Soda","Juice","Tea"], img:"https://picsum.photos/id/1068/1200/700" },
+      { q: "What's my biggest fear?", opts:["Heights","Spiders","Failure","Public speaking"], img:"https://picsum.photos/id/1076/1200/700" },
+      { q: "Do I prefer sweet or salty snacks?", opts:["Sweet","Salty","Both","Neither"], img:"https://picsum.photos/id/1081/1200/700" },
+      { q: "Do I like reading or gaming more?", opts:["Reading","Gaming","Both","Neither"], img:"https://picsum.photos/id/1091/1200/700" },
+      { q: "Do I prefer dogs or cats?", opts:["Dogs","Cats","Both","Neither"], img:"https://picsum.photos/id/1078/1200/700" },
+      { q: "Do I like pineapple on pizza?", opts:["Yes","No","Sometimes","Never tried"], img:"https://picsum.photos/id/1006/1200/700" },
+      { q: "Do I prefer beaches or mountains?", opts:["Beaches","Mountains","Both","Neither"], img:"https://picsum.photos/id/1018/1200/700" },
+      { q: "Would I binge a whole season in one night?", opts:["Yes","No","Only sometimes","Depends on the show"], img:"https://picsum.photos/id/1029/1200/700" },
+      { q: "Do I like dancing?", opts:["Yes","No","Sometimes","Only when drunk"], img:"https://picsum.photos/id/1019/1200/700" },
+      { q: "What's my favorite time of day?", opts:["Morning","Afternoon","Evening","Late night"], img:"https://picsum.photos/id/1038/1200/700" },
+      { q: "Do I like driving or being driven?", opts:["Driving","Being driven","Both","Neither"], img:"https://picsum.photos/id/1049/1200/700" },
+      { q: "Do I like spicy or mild food?", opts:["Spicy","Mild","Both","Neither"], img:"https://picsum.photos/id/1055/1200/700" },
+      { q: "Do I play an instrument?", opts:["Yes","No","Used to","Learning"], img:"https://picsum.photos/id/1062/1200/700" },
+      { q: "What's my favourite ice-cream topping?", opts:["Chocolate chips","Caramel","Nuts","Sprinkles"], img:"https://picsum.photos/id/1065/1200/700" },
+      { q: "What's my go-to party look?", opts:["Casual","Glam","Streetwear","Formal"], img:"https://picsum.photos/id/1048/1200/700" },
+      { q: "Do I prefer texting or calling?", opts:["Texting","Calling","Depends","Both"], img:"https://picsum.photos/id/1071/1200/700" },
+      { q: "Do I prefer coffee or tea?", opts:["Coffee","Tea","Neither","Both"], img:"https://picsum.photos/id/1020/1200/700" },
+      { q: "Do I prefer summer or winter?", opts:["Summer","Winter","Spring","Autumn"], img:"https://picsum.photos/id/1014/1200/700" },
+      { q: "Do I like horror movies?", opts:["Yes","No","Sometimes","Only thrillers"], img:"https://picsum.photos/id/1036/1200/700" },
+      { q: "What's my favorite weekend plan?", opts:["Chill at home","Go out with friends","Travel","Study/work"], img:"https://picsum.photos/id/1092/1200/700" },
+      { q: "Am I an early planner or last-minute person?", opts:["Plan early","Last-minute","Mix of both","Depends"], img:"https://picsum.photos/id/1050/1200/700" }
+    ];
+
+    // --- State and helper functions ---
+    const appContainer = document.getElementById('app');
+    const params = new URLSearchParams(window.location.search);
+    const quizId = params.get('quiz');
+    const creatorName = params.get('creator');
+
+    let quizState = {
+      creatorName: "",
+      quizQuestions: [],
+      currentQuestionIndex: 0,
+      creatorAnswers: [],
+      playerAnswers: []
+    };
+
+    function render(content) {
+      appContainer.innerHTML = content;
+    }
+
+    // --- VIEWS ---
+
+    // 1. HOME/CREATOR NAME INPUT
+    function showCreatorNameInput() {
+      render(`
+        <div style="font-weight:700">Create your Buddyz quiz</div>
+        <div class="small" style="margin-top:8px">Enter your display name (this will show to people you share with).</div>
+        <div style="margin-top:12px">
+          <input id="creatorNameInput" type="text" placeholder="Your name (e.g., Tola)" />
+        </div>
+        <div style="margin-top:12px">
+          <button id="startCreateBtn" class="btn" disabled>Start Quiz</button>
+        </div>
+      `);
+      const nameInput = document.getElementById('creatorNameInput');
+      const startBtn = document.getElementById('startCreateBtn');
+      nameInput.addEventListener('input', () => {
+        startBtn.disabled = nameInput.value.trim().length < 2;
+      });
+      startBtn.addEventListener('click', () => {
+        quizState.creatorName = nameInput.value.trim();
+        quizState.quizQuestions = pickRandom(QUESTIONS, 15);
+        quizState.creatorAnswers = new Array(quizState.quizQuestions.length).fill(null);
+        showCreatorQuizStep();
+      });
+    }
+
+    // 2. CREATOR QUIZ STEPS
+    function showCreatorQuizStep() {
+      const q = quizState.quizQuestions[quizState.currentQuestionIndex];
+      const progressPercent = Math.round((quizState.currentQuestionIndex / quizState.quizQuestions.length) * 100);
+      
+      render(`
+        <div class="meta-row">
+          <div style="font-weight:700">Creating: ${quizState.creatorName}</div>
+          <div class="small">Question ${quizState.currentQuestionIndex + 1}/${quizState.quizQuestions.length}</div>
+        </div>
+        <img src="${q.img}" class="q-image" alt="">
+        <div style="font-weight:600">${q.q}</div>
+        <div class="small">Pick the option that matches YOU</div>
+        <div class="options" id="options-container"></div>
+        <div class="meta-row" style="margin-top:10px">
+          <div class="progress" style="flex:1"><div class="bar" style="width:${progressPercent}%"></div></div>
+          <div style="min-width:140px">
+            <button id="nextBtn" class="btn">Next</button>
+          </div>
+        </div>
+      `);
+
+      const optionsContainer = document.getElementById('options-container');
+      q.opts.forEach((opt, index) => {
+        const div = document.createElement('div');
+        div.className = 'opt' + (quizState.creatorAnswers[quizState.currentQuestionIndex] === index ? ' selected' : '');
+        div.textContent = opt;
+        div.onclick = () => {
+          quizState.creatorAnswers[quizState.currentQuestionIndex] = index;
+          // UI update
+          Array.from(optionsContainer.children).forEach(child => child.classList.remove('selected'));
+          div.classList.add('selected');
+        };
+        optionsContainer.appendChild(div);
+      });
+
+      document.getElementById('nextBtn').onclick = () => {
+        // Validation
+        if (quizState.creatorAnswers[quizState.currentQuestionIndex] === null) {
+          alert('Please select an answer!');
+          return;
+        }
+        if (quizState.currentQuestionIndex < quizState.quizQuestions.length - 1) {
+          quizState.currentQuestionIndex++;
+          showCreatorQuizStep();
+        } else {
+          publishQuiz();
+        }
+      };
+    }
+
+    // 3. PUBLISH QUIZ & GET LINK
+    async function publishQuiz() {
+      const quizRef = push(ref(db, 'quizzes'));
+      const quizData = {
+        creator: quizState.creatorName,
+        questions: quizState.quizQuestions.map((q, i) => ({
+          q: q.q,
+          opts: q.opts,
+          img: q.img,
+          correctIndex: quizState.creatorAnswers[i]
+        })),
+        createdAt: Date.now()
+      };
+      await set(quizRef, quizData);
+      const newQuizId = quizRef.key;
+      const shareLink = `${window.location.origin}${window.location.pathname}?quiz=${newQuizId}`;
+
+      render(`
+        <div style="font-weight:700">Quiz Published 🎉</div>
+        <div class="small" style="margin-top:8px">Share this link with friends so they can take your quiz:</div>
+        <div style="margin-top:8px" class="linkbox">
+          <input id="shareLink" value="${shareLink}" readonly />
+          <button id="copyShare" class="btn">Copy</button>
+        </div>
+        <div style="margin-top:12px"><button id="viewResults" class="secondary">View My Results Dashboard</button></div>
+        <div style="margin-top:12px" class="small">Or... <a href="${window.location.origin}${window.location.pathname}">create a new quiz</a>.</div>
+      `);
+
+      document.getElementById('copyShare').onclick = () => {
+        navigator.clipboard.writeText(shareLink).then(() => alert('Link copied!'));
+      };
+      document.getElementById('viewResults').onclick = () => {
+        // EXTRA FEATURE: Seamless transition to results view
+        window.location.href = `${window.location.origin}${window.location.pathname}?quiz=${newQuizId}`;
+      };
+    }
+
+    // 4. FRIEND QUIZ STEPS
+    async function showFriendQuizStep(quizData) {
+      if (!quizState.playerAnswers.length) {
+        // Initial state for friend
+        quizState.creatorName = quizData.creator;
+        quizState.quizQuestions = quizData.questions;
+        quizState.playerAnswers = new Array(quizData.questions.length).fill(null);
+        quizState.currentQuestionIndex = 0;
+      }
+      
+      const q = quizState.quizQuestions[quizState.currentQuestionIndex];
+      const progressPercent = Math.round((quizState.currentQuestionIndex / quizState.quizQuestions.length) * 100);
+
+      render(`
+        <div class="meta-row">
+          <div style="font-weight:700">${quizState.creatorName}'s quiz</div>
+          <div class="small">Question ${quizState.currentQuestionIndex + 1}/${quizState.quizQuestions.length}</div>
+        </div>
+        <img src="${q.img}" class="q-image" alt="">
+        <div style="font-weight:600">${q.q}</div>
+        <div class="small">Pick one</div>
+        <div class="options" id="options-container"></div>
+        <div class="meta-row" style="margin-top:10px">
+          <div class="progress" style="flex:1"><div class="bar" style="width:${progressPercent}%"></div></div>
+          <div style="min-width:140px">
+            <button id="nextBtn" class="btn">Next</button>
+          </div>
+        </div>
+      `);
+
+      const optionsContainer = document.getElementById('options-container');
+      q.opts.forEach((opt, index) => {
+        const div = document.createElement('div');
+        div.className = 'opt' + (quizState.playerAnswers[quizState.currentQuestionIndex] === index ? ' selected' : '');
+        div.textContent = opt;
+        div.onclick = () => {
+          quizState.playerAnswers[quizState.currentQuestionIndex] = index;
+          Array.from(optionsContainer.children).forEach(child => child.classList.remove('selected'));
+          div.classList.add('selected');
+        };
+        optionsContainer.appendChild(div);
+      });
+
+      document.getElementById('nextBtn').onclick = () => {
+        if (quizState.playerAnswers[quizState.currentQuestionIndex] === null) {
+          alert('Please select an answer!');
+          return;
+        }
+        if (quizState.currentQuestionIndex < quizState.quizQuestions.length - 1) {
+          quizState.currentQuestionIndex++;
+          showFriendQuizStep(quizData);
+        } else {
+          submitFriendResult(quizData);
+        }
+      };
+    }
+
+    // 5. SUBMIT & SHOW FRIEND RESULTS
+    async function submitFriendResult(quizData) {
+      let score = 0;
+      quizState.playerAnswers.forEach((answer, index) => {
+        if (answer === quizData.questions[index].correctIndex) {
+          score++;
+        }
+      });
+      const percent = Math.round((score / quizData.questions.length) * 100);
+
+      const friendName = prompt("Enter your name to see your score on the leaderboard:", "Friend");
+      if (friendName) {
+        // HEAVY-LOADED PART: Saving a friend's result
+        await push(ref(db, `results/${quizId}`), {
+          name: friendName,
+          score,
+          percent,
+          timestamp: Date.now(),
+          answers: quizState.playerAnswers
+        });
+      }
+
+      render(`
+        <div style="font-weight:700">You scored ${percent}%! 🎉</div>
+        <div class="small" style="margin-top:8px">You got ${score} out of ${quizData.questions.length} questions right.</div>
+        
+        <div class="quiz-results-container">
+          <h4>Your detailed results:</h4>
+          ${quizData.questions.map((q, i) => {
+            const isCorrect = quizState.playerAnswers[i] === q.correctIndex;
+            const friendAnswer = q.opts[quizState.playerAnswers[i]];
+            const creatorAnswer = q.opts[q.correctIndex];
+            return `<div class="small" style="margin-bottom: 8px;">
+              <strong>Q${i+1}: ${q.q}</strong><br>
+              Your Answer: <span style="color:${isCorrect ? 'var(--ok)' : '#d92828'}">${friendAnswer}</span><br>
+              Creator's Answer: <span style="color:var(--ok)">${creatorAnswer}</span>
+            </div>`;
+          }).join('')}
+        </div>
+        
+        <div style="margin-top:12px"><button id="homeBtn" class="btn">Take another quiz</button></div>
+      `);
+      document.getElementById('homeBtn').onclick = () => { window.location.href = window.location.origin + window.location.pathname; };
+    }
+
+    // 6. CREATOR'S DASHBOARD
+    async function showCreatorDashboard() {
+      const quizRef = ref(db, `quizzes/${quizId}`);
+      const resultsRef = ref(db, `results/${quizId}`);
+      
+      const quizSnap = await get(quizRef);
+      if (!quizSnap.exists()) {
+        render(`<div class="small">Quiz not found! The link may be invalid.</div>`);
+        return;
+      }
+      const quizData = quizSnap.val();
+      const creator = quizData.creator;
+      
+      render(`
+        <div style="font-weight:700">Results for ${creator}'s Quiz</div>
+        <div class="small" style="margin-top:8px">Share your quiz link to get more results!</div>
+        <div style="margin-top:12px" class="meta-row">
+            <input id="shareLink" value="${window.location.href}" readonly />
+            <button id="copyShare" class="btn">Copy link</button>
+        </div>
+        <div style="margin-top:12px">
+            <div style="font-weight:700">Leaderboard</div>
+            <ul id="leaderboard" class="leaderboard"></ul>
+        </div>
+        <div style="margin-top:12px"><button id="homeBtn" class="secondary">Create a new quiz</button></div>
+      `);
+      document.getElementById('copyShare').onclick = () => {
+        navigator.clipboard.writeText(document.getElementById('shareLink').value).then(() => alert('Link copied!'));
+      };
+      document.getElementById('homeBtn').onclick = () => { window.location.href = window.location.origin + window.location.pathname; };
+      
+      const leaderboardEl = document.getElementById('leaderboard');
+      leaderboardEl.innerHTML = '<li class="small">Loading leaderboard...</li>';
+
+      // EXTRA FEATURE: Real-time Leaderboard Updates
+      onValue(resultsRef, (snapshot) => {
+        const results = [];
+        snapshot.forEach(childSnapshot => {
+          results.push(childSnapshot.val());
+        });
+        
+        results.sort((a, b) => b.percent - a.percent);
+        
+        if (!results.length) {
+          leaderboardEl.innerHTML = '<li class="small">No friends have taken your quiz yet!</li>';
+        } else {
+          leaderboardEl.innerHTML = '';
+          results.forEach(r => {
+            const li = document.createElement('li');
+            li.innerHTML = `<strong>${r.name}</strong> — ${r.score}/${quizData.questions.length} (${r.percent}%)`;
+            leaderboardEl.appendChild(li);
+          });
+        }
+      });
+    }
+
+    // --- APP ROUTING ---
+    (async function boot() {
+      if (quizId) {
+        // If a quiz ID is in the URL, this is a shared link.
+        // We'll check if the user is the creator or a friend.
+        const quizRef = ref(db, `quizzes/${quizId}`);
+        const quizSnap = await get(quizRef);
+        if (!quizSnap.exists()) {
+          render(`<div class="small">Quiz not found! The link may be invalid.</div>`);
+          return;
+        }
+        const quizData = quizSnap.val();
+        
+        // Let's assume if they have a quizId in the URL, they are the creator coming to view results.
+        // A friend will be prompted for their name.
+        if (confirm(`You're viewing the dashboard for ${quizData.creator}'s quiz. Do you want to take it instead?`)) {
+          showFriendNameInput(quizData);
+        } else {
+          showCreatorDashboard();
+        }
+      } else {
+        // No quiz ID in the URL, so this is the creator starting a new quiz.
+        showCreatorNameInput();
+      }
+    })();
+
+    function showFriendNameInput(quizData) {
+      render(`
+        <div style="font-weight:700">You're taking ${quizData.creator}'s quiz</div>
+        <div class="small" style="margin-top:8px">Enter your name so we can save your result</div>
+        <div style="margin-top:8px"><input id="playerNameInput" placeholder="Your name (e.g. 'Ada')"/></div>
+        <div style="margin-top:12px"><button id="startPlayBtn" class="btn" disabled>Start Quiz</button></div>
+      `);
+      const playerNameInput = document.getElementById('playerNameInput');
+      const startPlayBtn = document.getElementById('startPlayBtn');
+      playerNameInput.addEventListener('input', () => {
+        startPlayBtn.disabled = playerNameInput.value.trim().length < 2;
+      });
+      startPlayBtn.onclick = () => showFriendQuizStep(quizData);
+    }
+    
+    // --- UTILITY FUNCTIONS ---
+    function pickRandom(arr, n) {
+      const a = arr.slice();
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a.slice(0, n);
+    }
+  </script>
+</body>
+</html>

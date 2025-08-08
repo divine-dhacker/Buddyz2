@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Buddyz — Quiz</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" xintegrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ964pXSK9iQdYc5G6uT4P8eWq71d+S44A/H+P60f4j4g9wQ/Y5A5B6F+g==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+</head>
+<body>
+    <header>
+        <div class="header-left">
+            <div class="logo">BZ</div>
+            <div>
+                <h1 id="page-title">Loading Quiz...</h1>
+                <div class="small">Answer the questions to see how well you know them.</div>
+            </div>
+        </div>
+        <button class="menu-btn" aria-label="Open menu"><i class="fa-solid fa-bars"></i></button>
+    </header>
+
+    <main id="app"></main>
+    
+    <footer>
+        <div class="progress">
+            <div class="bar"></div>
+        </div>
+    </footer>
+
+    <!-- Hamburger Menu Overlay -->
+    <div id="menu-overlay" class="menu-overlay">
+        <button class="close-btn" aria-label="Close menu">&times;</button>
+        <ul class="menu-list">
+            <li><a href="index.html">Home</a></li>
+            <li><a href="#">About Us</a></li>
+            <li><a href="#blog-list">Blog</a></li>
+            <li><a href="#">Privacy Policy</a></li>
+            <li><a href="#">Terms & Conditions</a></li>
+            <li><a href="#">Contact Us</a></li>
+        </ul>
+    </div>
+    
+    <script type="module" src="app.js"></script>
+</body>
+</html>
+
