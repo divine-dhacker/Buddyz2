@@ -135,6 +135,7 @@ const appContainer = document.getElementById('app');
 let state = {
   quizId: null,
   creatorName: "",
+  friendName: "",
   quizQuestions: [],
   creatorAnswers: [],
   friendAnswers: [],
@@ -223,11 +224,20 @@ function handleQuiz() {
         const quizData = snapshot.val();
         state.quizId = quizId;
         state.creatorName = quizData.creator;
-        state.quizQuestions = quizData.questions;
-        state.creatorAnswers = quizData.answers;
+
+        // Ensure questions and answers are arrays
+        state.quizQuestions = Array.isArray(quizData.questions) ? quizData.questions : Object.values(quizData.questions || {});
+        state.creatorAnswers = Array.isArray(quizData.answers) ? quizData.answers : Object.values(quizData.answers || {});
+
+        // Ensure options within each question are arrays
+        state.quizQuestions.forEach(q => {
+            if (q.options && !Array.isArray(q.options)) {
+                q.options = Object.values(q.options);
+            }
+        });
+
         state.friendAnswers = new Array(state.quizQuestions.length).fill(null);
-        document.getElementById('page-title').textContent = `The ${state.creatorName} Quiz`;
-        renderQuizStep(isCreator);
+        promptForFriendName();
       } else {
         appContainer.innerHTML = `<div class="card"><h2>Quiz not found!</h2><p>The quiz you are looking for may have expired or been deleted.</p><a href="index.html" class="btn">Go Home</a></div>`;
       }
@@ -235,6 +245,32 @@ function handleQuiz() {
   } else {
     window.location.href = 'index.html';
   }
+}
+
+function promptForFriendName() {
+    document.getElementById('page-title').textContent = `You've been challenged by ${state.creatorName}!`;
+    const html = `
+        <form id="friend-name-form" class="question-card">
+            <div style="font-weight:700">Your Display Name</div>
+            <div class="small" style="margin-top:8px">This is the name ${state.creatorName} will see.</div>
+            <div style="margin-top:12px">
+                <input type="text" id="friend-name" placeholder="e.g. Tola's friend" required />
+            </div>
+            <div style="margin-top:12px">
+                <button type="submit" class="btn">Start Quiz</button>
+            </div>
+        </form>
+    `;
+    appContainer.innerHTML = html;
+
+    const friendNameForm = document.getElementById('friend-name-form');
+    friendNameForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const friendName = document.getElementById('friend-name').value;
+        state.friendName = friendName; // Store name in state
+        document.getElementById('page-title').textContent = `The ${state.creatorName} Quiz`;
+        renderQuizStep(false); // Start the quiz, isCreator = false
+    });
 }
 
 function renderQuizStep(isCreator) {
@@ -328,8 +364,7 @@ function displayShareLink(quizId) {
 
 function calculateFriendScore() {
     let score = 0;
-    const params = new URLSearchParams(window.location.search);
-    const friendName = params.get('friendName');
+    const friendName = state.friendName;
     
     for (let i = 0; i < state.creatorAnswers.length; i++) {
         if (state.creatorAnswers[i] === state.friendAnswers[i]) {
