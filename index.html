@@ -531,6 +531,7 @@
             let takerAnswers = [];
             let currentQuestionIndex = 0;
             let quizId = null;
+            let sharedQuizData = null; // Will hold quiz data from a shared URL
 
             // === QUIZ QUESTIONS DATA ===
             const allQuestions = [
@@ -571,9 +572,21 @@
 
             // === URL Logic to Determine View ===
             const urlParams = new URLSearchParams(window.location.search);
-            quizId = urlParams.get('id');
+            const encodedQuizData = urlParams.get('quiz');
+            quizId = urlParams.get('id'); // Still needed for scoreboard
             const view = urlParams.get('view');
             
+            if (encodedQuizData) {
+                try {
+                    // Decode the Base64 string and parse the JSON
+                    const decodedString = decodeURIComponent(escape(atob(encodedQuizData)));
+                    sharedQuizData = JSON.parse(decodedString);
+                } catch (e) {
+                    console.error("Failed to decode quiz data from URL:", e);
+                    showModal("The quiz link is invalid or corrupted.");
+                }
+            }
+
             // Helper function to show a specific section and hide all others.
             function hideAllSections() {
                 const allSections = document.querySelectorAll('main section');
@@ -588,33 +601,33 @@
                 }
             }
 
-            // === Local Storage and Initial View Logic ===
+            // === Initial View Logic ===
             const finalQuizResult = JSON.parse(localStorage.getItem('finalQuizResult'));
             const hasCreatedQuizzes = localStorage.getItem('myCreatedQuizzes') === 'true';
 
-            // Check for returning quiz-taker first
-            if (finalQuizResult) {
+            if (sharedQuizData) {
+                // A friend is taking a quiz from a shared link
+                hideAllSections();
+                showSection(takerSection);
+                // The quiz data from the URL will be used when the taker form is submitted
+            } else if (finalQuizResult) {
+                // A user just finished a quiz and is seeing their score
                 hideAllSections();
                 showSection(resultSection);
                 document.getElementById('final-score').innerText = `${finalQuizResult.score} / ${finalQuizResult.totalQuestions}`;
-                // Clear the stored result after displaying it
                 localStorage.removeItem('finalQuizResult');
             } else if (quizId && view === 'scoreboard') {
+                // The creator is viewing their scoreboard
                 hideAllSections();
                 showSection(scoreboardSection);
                 loadScoreboard(quizId);
-            } else if (quizId) {
-                // It's a quiz taker
-                hideAllSections();
-                showSection(takerSection);
             } else if (hasCreatedQuizzes) {
-                // It's a returning creator
+                // A returning creator is viewing their dashboard
                 hideAllSections();
                 showSection(creatorDashboard);
                 loadCreatorDashboard();
             } else {
-                // It's a new user
-                // Show the home sections
+                // A new user is on the homepage
                 document.getElementById('creator-section').style.display = 'flex';
                 document.getElementById('about').style.display = 'block';
                 document.getElementById('featured').style.display = 'block';
@@ -709,18 +722,17 @@
                     return;
                 }
                 
-                const quizzes = JSON.parse(localStorage.getItem('quizzes') || '[]');
-                const quizData = quizzes.find(q => q.id === quizId);
-
-                if (quizData) {
-                    currentQuizQuestions = quizData.questions;
+                // For a taker, the quiz data comes from the URL, not localStorage
+                if (sharedQuizData) {
+                    currentQuizQuestions = sharedQuizData.questions;
                     takerAnswers = Array(currentQuizQuestions.length).fill(null);
                     hideAllSections();
                     showSection(quizSection);
                     renderQuestion(currentQuizQuestions, takerAnswers);
-                    document.getElementById('quiz-heading').innerText = `${quizData.creatorName}'s Quiz`;
+                    document.getElementById('quiz-heading').innerText = `${sharedQuizData.creatorName}'s Quiz`;
                 } else {
-                    showModal("Quiz not found!");
+                     // This case should not be reached if the page load logic is correct
+                    showModal("Quiz data is missing. Please use a valid quiz link.");
                     window.location.href = window.location.origin;
                 }
             });
@@ -733,7 +745,8 @@
                     return;
                 }
 
-                const answersArray = quizId ? takerAnswers : creatorAnswers;
+                // If sharedQuizData exists, we're in a taker's flow. Otherwise, it's the creator's flow.
+                const answersArray = sharedQuizData ? takerAnswers : creatorAnswers;
                 answersArray[currentQuestionIndex] = selected.dataset.value;
 
                 if (currentQuestionIndex < currentQuizQuestions.length - 1) {
@@ -749,7 +762,7 @@
             prevBtn.addEventListener('click', () => {
                 if (currentQuestionIndex > 0) {
                     currentQuestionIndex--;
-                    const answersArray = quizId ? takerAnswers : creatorAnswers;
+                    const answersArray = sharedQuizData ? takerAnswers : creatorAnswers;
                     renderQuestion(currentQuizQuestions, answersArray);
                 }
                 prevBtn.style.display = currentQuestionIndex > 0 ? 'block' : 'none';
@@ -765,51 +778,26 @@
                     return;
                 }
                 
-                const answersArray = quizId ? takerAnswers : creatorAnswers;
+                const answersArray = sharedQuizData ? takerAnswers : creatorAnswers;
                 answersArray[currentQuestionIndex] = selected.dataset.value;
                 
-                // Taker's quiz submission
-                if (quizId) {
-                    const quizzes = JSON.parse(localStorage.getItem('quizzes') || '[]');
-                    const quizIndex = quizzes.findIndex(q => q.id === quizId);
-                    
-                    if (quizIndex === -1) {
-                        showModal("Quiz not found!");
-                        return;
-                    }
-
-                    const quizData = quizzes[quizIndex];
-                    
+                // Taker's quiz submission from a shared link
+                if (sharedQuizData) {
                     let score = 0;
                     answersArray.forEach((answer, index) => {
-                        if (answer === quizData.questions[index].correctAnswer) {
+                        if (answer === sharedQuizData.questions[index].correctAnswer) {
                             score++;
                         }
                     });
 
-                    // Add score to the quiz in local storage
-                    if (!quizData.scores) {
-                        quizData.scores = [];
-                    }
-                    quizData.scores.push({
-                        friendName: takerNameInput.value.trim(),
-                        score: score,
-                        timestamp: new Date().toISOString()
-                    });
-
-                    // Increment takersCount
-                    quizData.takersCount = (quizData.takersCount || 0) + 1;
-
-                    // Save the updated quizzes array back to local storage
-                    quizzes[quizIndex] = quizData;
-                    localStorage.setItem('quizzes', JSON.stringify(quizzes));
-
+                    // Store the result in localStorage to show on the results page after reload
                     const finalScoreData = { score, totalQuestions: currentQuizQuestions.length };
                     localStorage.setItem('finalQuizResult', JSON.stringify(finalScoreData));
                     
-                    hideAllSections();
-                    showSection(resultSection);
-                    document.getElementById('final-score').innerText = `${score} / ${currentQuizQuestions.length}`;
+                    // Reload the page to display the score.
+                    // The initial page logic will detect 'finalQuizResult' and show the result section.
+                    window.location.reload();
+
                 } else { // Creator's quiz submission
                     currentQuizQuestions.forEach((question, index) => {
                         question.correctAnswer = creatorAnswers[index];
@@ -834,8 +822,16 @@
 
                     hideAllSections();
                     showSection(shareSection);
-                    const quizLink = `${window.location.origin}${window.location.pathname}?id=${newQuizId}`;
+
+                    // Encode the quiz data for the shareable link
+                    const quizDataString = JSON.stringify(newQuiz);
+                    // Use a URL-safe Base64 encoding to handle special characters
+                    const encodedQuizData = btoa(unescape(encodeURIComponent(quizDataString)));
+
+                    const quizLink = `${window.location.origin}${window.location.pathname}?quiz=${encodedQuizData}`;
                     document.getElementById('share-link').value = quizLink;
+
+                    // The "View Results" link for the creator still uses the ID-based URL
                     document.getElementById('view-results-link').href = `?id=${newQuizId}&view=scoreboard`;
                 }
             });
